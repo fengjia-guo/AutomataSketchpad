@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { GridLayer } from './GridLayer';
-import { DemoState, demoStateProps, StateProps } from './State';
-import StateLayer, { StateLayerProps } from './StateLayer';
+import { demoStateProps, StateProps } from './State';
+import StateLayer from './StateLayer';
 import { gridRegularizer } from './regularizer';
+import { getUniqueID } from './uuidRecord';
 
 export interface Point {
   x: number;
@@ -20,12 +21,14 @@ export interface BoardConfig {
   minScale: number;
   maxScale: number;
   gridSize: number;
+  stateRadius: number;
 }
 
 export const defaultBoardConfig: BoardConfig = {
   minScale: 0.1, 
   maxScale: 10, 
   gridSize: 100, 
+  stateRadius: 0.25, 
 };
 
 const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig}) => {
@@ -36,7 +39,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [lastTransform, setLastTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
 
-  const [states, setStates] = useState<Record<string, StateProps>>({'0': demoStateProps});
+  const [states, setStates] = useState<Record<string, StateProps>>({});
   const [selected, setSelected] = useState<null | string>(null);
 
   const minScale = cfg.minScale;
@@ -199,8 +202,16 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     };
     const result = gridRegularizer(null, states, newRelativePostion.x, newRelativePostion.y);
     if (result) {
-
-      // const newState: StateProps = {id: "state_0"};
+      const newID = getUniqueID(states);
+      const newState: StateProps = {
+        id: newID, 
+        label: `q_${newID[0]}`, 
+        position: result, 
+        radius: cfg.stateRadius, 
+        isAccepting: false, 
+        isDummy: false
+      };
+      setStates({...states, ...{[newID]: newState}});
     }
   }, [states, transform, cfg]);
 
@@ -253,7 +264,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         ref={boardRef}
         className="w-full h-full cursor-grab select-none relative"
         onMouseDown={handleMouseDown}
-        onDoubleClick={() => {console.log('double clicked')}}
+        onDoubleClick={handleDoubleClick}
         style={{
           cursor: isDragging ? 'grabbing' : 'grab',
         }}
