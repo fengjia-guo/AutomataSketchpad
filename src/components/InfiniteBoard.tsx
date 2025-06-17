@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { GridLayer } from './GridLayer';
-import { demoStateProps, StateProps } from './State';
+import { StateProps } from './State';
 import StateLayer from './StateLayer';
 import { gridRegularizer } from './regularizer';
 import { getUniqueID } from './uuidRecord';
@@ -31,6 +31,11 @@ export const defaultBoardConfig: BoardConfig = {
   stateRadius: 0.25, 
 };
 
+export interface AutomataGraph {
+  states: Record<string, StateProps>;
+  boardConfig: BoardConfig;
+}
+
 const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig}) => {
   const boardRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
@@ -42,11 +47,74 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [states, setStates] = useState<Record<string, StateProps>>({});
   const [selected, setSelected] = useState<null | string>(null);
 
+  const [history, setHistory] = useState<AutomataGraph[]>([{states: {}, boardConfig: cfg}]);
+  const [head, setHead] = useState<number>(0);
+  const [config, setConfig] = useState<BoardConfig>(cfg);
+  const [needUpdate, setNeedUpdate] = useState(false);
+
+  const headRef = useRef(head);
+  const historyRef = useRef(history);
+
+  useEffect(() => {
+    headRef.current = head;
+  }, [head]);
+  
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  const undo = useCallback(() => {
+    if (headRef.current > 0) {
+      setHead(headRef.current - 1);
+    }
+  }, []);
+
+  const forward = useCallback(() => {
+    if (headRef.current + 1 < historyRef.current.length) {
+      setHead(headRef.current + 1);
+    }
+  }, []);
+
+  const updateHistory = useCallback(() => {
+    if (needUpdate) {
+      setHistory([...history.slice(0, head + 1), {states: states, boardConfig: config}]);
+      setHead(head + 1);
+      setNeedUpdate(false);
+    }
+  }, [states, config, history, head, needUpdate]);
+
+  const syncHead = useCallback(() => {
+    setStates(history[head].states);
+    setConfig(history[head].boardConfig);
+  }, [head, history]);
+
+  useEffect(() => {
+    syncHead();
+  }, [head]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      e.preventDefault();
+      undo();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      e.preventDefault();
+      forward();
+    }
+  }, []);
+
+  useEffect(() => {
+    updateHistory();
+  }, [needUpdate]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);  
+
   const minScale = cfg.minScale;
   const maxScale = cfg.maxScale;
 
   const onStatesChange = useCallback((changes: Record<string, StateProps>) => {
-    // console.log(changes);
     setStates({...states, ...changes});
   }, [states]);
 
@@ -54,7 +122,6 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     if (e.button !== 0) return; // Only handle left click
     
     setIsMouseDown(true);
-    // setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
     setLastTransform(transform);
     
@@ -182,15 +249,6 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }, [isMouseDown, handleMouseMove, handleMouseUp]);
 
-  const getOriginPosition = () => {
-    return {
-      x: transform.x,
-      y: transform.y
-    };
-  };
-
-  const origin = getOriginPosition();
-
   const boardProps = {transform: transform, boardRef: boardRef, boardConfig: cfg}
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -212,6 +270,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         isDummy: false
       };
       setStates({...states, ...{[newID]: newState}});
+      setNeedUpdate(true);
     }
   }, [states, transform, cfg]);
 
@@ -256,6 +315,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           <div>• Drag to pan around</div>
           <div>• Scroll to zoom in/out</div>
           <div>• Use controls to reset</div>
+          <div> {`HEAD: ${head}`}</div>
         </div>
       </div>
 
@@ -276,44 +336,17 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           }}
         >
           {<GridLayer transform={transform} boardRef={boardRef} boardConfig={cfg}/>}
-          
-          {/* Origin marker - only show if it's visible on screen */}
-          {origin.x >= -20 && origin.x <= (boardRef.current?.clientWidth || 0) + 20 &&
-           origin.y >= -20 && origin.y <= (boardRef.current?.clientHeight || 0) + 20 && (
-            <>
-              <circle
-                cx={origin.x}
-                cy={origin.y}
-                r={4}
-                fill="#3b82f6"
-                opacity={Math.min(1, transform.scale)}
-              />
-              
-              {/* Coordinate labels */}
-              {transform.scale > 0.5 && (
-                <text
-                  x={origin.x + 8}
-                  y={origin.y - 8}
-                  fontSize={12}
-                  fill="#6b7280"
-                  className="select-none pointer-events-none"
-                >
-                  (0, 0)
-                </text>
-              )}
-            </>
-          )}
         </svg>
       </div>
-      {/* <DemoState p={boardProps}/> */}
       <StateLayer 
         states={states} 
         boardProps={boardProps} 
         onStatesChange={onStatesChange} 
         selected={selected} 
-        setSelected={setSelected}/>
-      
-
+        setSelected={setSelected}
+        setStates={setStates}
+        callForUpdate={() => setNeedUpdate(true)}
+      />
       {/* Loading state when dragging */}
       {isDragging && (
         <div className="absolute inset-0 pointer-events-none">

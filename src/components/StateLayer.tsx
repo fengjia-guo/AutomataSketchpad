@@ -9,6 +9,8 @@ export interface StateLayerProps {
   selected?: null | string, 
   setSelected?: (_: null | string) => void, 
   onStatesChange?: (_: Record<string, StateProps>) => void, 
+  setStates?: (_: Record<string, StateProps>) => void, 
+  callForUpdate?: () => void, 
 }
 
 export const StateLayer: React.FC<StateLayerProps> = ({
@@ -16,20 +18,38 @@ export const StateLayer: React.FC<StateLayerProps> = ({
   boardProps, 
   selected = null, 
   setSelected = () => {}, 
-  onStatesChange = () => {}
+  onStatesChange = () => {}, 
+  setStates = () => {}, 
+  callForUpdate = () => {}, 
 }) => {
-  // const layerRef = useRef<HTMLDivElement>(null);
   
   const dragRegularizer = useCallback((state: StateProps, x: number, y: number) => {
     return gridRegularizer(state, states, x, y);
   }, [states]);
 
   const onPositionChange = useCallback((state: StateProps, newPos: Position | null) => {
-    // console.log(newPos);
     if (!newPos) return;
     const newStateProp = {...state, position: newPos};
     onStatesChange({[state.id]: newStateProp});
   }, [onStatesChange]);
+
+  const onDoubleClick = useCallback((state: StateProps) => {
+    const newStateProp: StateProps = {...state, isAccepting: !state.isAccepting};
+    onStatesChange({[state.id]: newStateProp});
+    callForUpdate();
+  }, [onStatesChange]);
+
+  const deleteState = useCallback((state: StateProps) => {
+    let remainingStates: Record<string, StateProps> = {};
+    for (const key in states) {
+      if (key !== state.id) {
+        remainingStates[key] = states[key];
+      }
+    }
+    setSelected(null);
+    setStates(remainingStates);
+    callForUpdate();
+  }, [states]);
 
   return (
     <div>
@@ -42,6 +62,9 @@ export const StateLayer: React.FC<StateLayerProps> = ({
             positionRegularizer={dragRegularizer}
             onPositionChange={onPositionChange}
             onClick={(s) => setSelected(s.id)}
+            onDoubleClick={onDoubleClick}
+            onDelete={deleteState}
+            callForUpdate={callForUpdate}
           />
         </div>
       ))}
