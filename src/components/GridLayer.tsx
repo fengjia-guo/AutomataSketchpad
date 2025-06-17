@@ -6,8 +6,8 @@ export interface BoardObjectProps {
   boardConfig?: BoardConfig
 }
 
-const mainLineColor = '#3b82f6';
-const lineColor = '#c5c7cb';
+export const mainLineColor = '#2563eb'; 
+export const lineColor = '#c5c7cb';
 
 export const GridLayer: React.FC<BoardObjectProps> = (props) => {
   const boardConfig = props.boardConfig || defaultBoardConfig;

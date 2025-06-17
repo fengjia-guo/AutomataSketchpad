@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { GridLayer } from './GridLayer';
-import { DemoState } from './State';
+import { DemoState, demoStateProps, StateProps } from './State';
+import StateLayer, { StateLayerProps } from './StateLayer';
+import { gridRegularizer } from './regularizer';
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
@@ -34,8 +36,16 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [lastTransform, setLastTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
 
+  const [states, setStates] = useState<Record<string, StateProps>>({'0': demoStateProps});
+  const [selected, setSelected] = useState<null | string>(null);
+
   const minScale = cfg.minScale;
   const maxScale = cfg.maxScale;
+
+  const onStatesChange = useCallback((changes: Record<string, StateProps>) => {
+    // console.log(changes);
+    setStates({...states, ...changes});
+  }, [states]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only handle left click
@@ -53,10 +63,12 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isMouseDown) return;
 
-    setIsDragging(true);
-
     const deltaX = e.clientX - dragStart.x;
     const deltaY = e.clientY - dragStart.y;
+
+    if (deltaX !== 0 && deltaY !== 0) {
+      setIsDragging(true);
+    }
 
     setTransform({
       ...lastTransform,
@@ -66,12 +78,16 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   }, [isMouseDown, dragStart, lastTransform]);
 
   const handleMouseUp = useCallback(() => {
+    if (!isDragging) {
+      setSelected(null);
+      // clear selected
+    }
     setIsDragging(false);
     setIsMouseDown(false);
     if (boardRef.current) {
       boardRef.current.style.cursor = 'grab';
     }
-  }, []);
+  }, [isDragging]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
@@ -82,7 +98,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const delta = e.deltaY * -0.001;
+    const delta = e.deltaY * -0.003;
     const newScale = Math.min(Math.max(transform.scale + delta, minScale), maxScale);
 
     if (newScale === transform.scale) return;
@@ -172,6 +188,22 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
 
   const origin = getOriginPosition();
 
+  const boardProps = {transform: transform, boardRef: boardRef, boardConfig: cfg}
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const scaledGridSize = transform.scale * cfg.gridSize;
+    const newRelativePostion = {
+      x: (e.clientX - transform.x) / scaledGridSize,
+      y: (e.clientY - transform.y) / scaledGridSize
+    };
+    const result = gridRegularizer(null, states, newRelativePostion.x, newRelativePostion.y);
+    if (result) {
+
+      // const newState: StateProps = {id: "state_0"};
+    }
+  }, [states, transform, cfg]);
+
   return (
     <div className="w-full h-screen relative overflow-hidden bg-gray-50">
       {/* Controls */}
@@ -221,6 +253,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         ref={boardRef}
         className="w-full h-full cursor-grab select-none relative"
         onMouseDown={handleMouseDown}
+        onDoubleClick={() => {console.log('double clicked')}}
         style={{
           cursor: isDragging ? 'grabbing' : 'grab',
         }}
@@ -232,7 +265,6 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           }}
         >
           {<GridLayer transform={transform} boardRef={boardRef} boardConfig={cfg}/>}
-          {<DemoState p={{transform: transform, boardRef: boardRef, boardConfig: cfg}}/>}
           
           {/* Origin marker - only show if it's visible on screen */}
           {origin.x >= -20 && origin.x <= (boardRef.current?.clientWidth || 0) + 20 &&
@@ -262,6 +294,14 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           )}
         </svg>
       </div>
+      {/* <DemoState p={boardProps}/> */}
+      <StateLayer 
+        states={states} 
+        boardProps={boardProps} 
+        onStatesChange={onStatesChange} 
+        selected={selected} 
+        setSelected={setSelected}/>
+      
 
       {/* Loading state when dragging */}
       {isDragging && (
