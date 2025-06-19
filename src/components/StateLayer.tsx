@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { Position, State, StateProps } from "./State";
 import { BoardObjectProps } from "./GridLayer";
-import { gridRegularizer } from "./regularizer";
+import { gridRegularizer, RegularizerAction, updateStatesByAction } from "./regularizer";
 
 export interface StateLayerProps {
   states: Record<string, StateProps>, 
@@ -27,19 +27,42 @@ export const StateLayer: React.FC<StateLayerProps> = ({
     return gridRegularizer(state, states, x, y);
   }, [states]);
 
-  const onPositionChange = useCallback((state: StateProps, newPos: Position | null) => {
-    if (!newPos) return;
-    const newStateProp = {...state, position: newPos};
-    onStatesChange({[state.id]: newStateProp});
-  }, [onStatesChange]);
+  const onPositionChange = useCallback((state: StateProps, result: Position | null | RegularizerAction) => {
+    if (!result) return;
+    if (result instanceof RegularizerAction) {
+      // console.log('get an action');
+      const changes = updateStatesByAction(state, states, result);
+      onStatesChange(changes);
+    } else {
+      const newStateProp: StateProps = {...state, position: result, merged: null};
+      if (state.merged) {
+        return onStatesChange({
+          [state.id]: newStateProp, 
+          [state.merged]: {...states[state.merged], mergedBy: false}
+        });
+      } else {
+        return onStatesChange({[state.id]: newStateProp}); 
+      }
+    }
+  }, [onStatesChange, states]);
 
   const onDoubleClick = useCallback((state: StateProps) => {
+    if (state.isDummy) return;
     const newStateProp: StateProps = {...state, isAccepting: !state.isAccepting};
     onStatesChange({[state.id]: newStateProp});
     callForUpdate();
   }, [onStatesChange]);
 
+  const downgradeState = useCallback((state: StateProps) => {
+    if (!state.isDummy) {
+      const newStateProp: StateProps = {...state, isAccepting: false, isDummy: true};
+      onStatesChange({[state.id]: newStateProp});
+      callForUpdate();
+    }
+  }, [states, onStatesChange, callForUpdate]);
+
   const deleteState = useCallback((state: StateProps) => {
+    if (!state.isDummy) return;
     let remainingStates: Record<string, StateProps> = {};
     for (const key in states) {
       if (key !== state.id) {
@@ -50,6 +73,19 @@ export const StateLayer: React.FC<StateLayerProps> = ({
     setStates(remainingStates);
     callForUpdate();
   }, [states]);
+
+  const handleDelete = useCallback((state: StateProps) => {
+    if (!selected || selected !== state.id) return;
+    if (state.isDummy) {
+      deleteState(state);
+    } else {
+      downgradeState(state);
+    }
+  }, [selected]);
+
+  const StateEditor = <div className="absolute bottom-3 left-3 right-3 h-[25vh] bg-white rounded-xl shadow-xl p-4">
+    { selected ? states[selected].id : <span>edit here</span>}
+  </div>
 
   return (
     <div>
@@ -63,11 +99,12 @@ export const StateLayer: React.FC<StateLayerProps> = ({
             onPositionChange={onPositionChange}
             onClick={(s) => setSelected(s.id)}
             onDoubleClick={onDoubleClick}
-            onDelete={deleteState}
+            onDelete={handleDelete}
             callForUpdate={callForUpdate}
           />
         </div>
       ))}
+      {StateEditor}
     </div>
   );
 };

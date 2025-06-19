@@ -66,18 +66,33 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const undo = useCallback(() => {
     if (headRef.current > 0) {
       setHead(headRef.current - 1);
+      setSelected(null);
     }
   }, []);
 
   const forward = useCallback(() => {
     if (headRef.current + 1 < historyRef.current.length) {
       setHead(headRef.current + 1);
+      setSelected(null);
     }
   }, []);
 
   const updateHistory = useCallback(() => {
     if (needUpdate) {
-      setHistory([...history.slice(0, head + 1), {states: states, boardConfig: config}]);
+      // drop merged states
+      let newStates: Record<string, StateProps> = {};
+      for (const key in states) {
+        if (states[key].merged) {
+          // TODO: update transitions later
+          if (selected === key) {
+            setSelected(states[key].merged);
+          }
+        } else {
+          newStates[key] = {...states[key], mergedBy: false};
+        }
+      }
+      setHistory([...history.slice(0, head + 1), {states: newStates, boardConfig: config}]);
+      setStates(newStates);
       setHead(head + 1);
       setNeedUpdate(false);
     }
@@ -267,7 +282,9 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         position: result, 
         radius: cfg.stateRadius, 
         isAccepting: false, 
-        isDummy: false
+        isDummy: false, 
+        merged: null, 
+        mergedBy: false, 
       };
       setStates({...states, ...{[newID]: newState}});
       setNeedUpdate(true);

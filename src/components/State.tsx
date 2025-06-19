@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react"
 import { BoardObjectProps } from "./GridLayer"
 import { defaultBoardConfig, Point } from "./InfiniteBoard"
+import { RegularizerAction } from "./regularizer"
 
 export interface Position {
     x: number, 
@@ -13,15 +14,17 @@ export interface StateProps {
   radius: number, 
   isAccepting: boolean, 
   isDummy: boolean, 
-  label: string
+  label: string, 
+  merged: null | string, 
+  mergedBy: boolean, 
 };
 
 interface renderStateProps {
   state: StateProps, 
   selected: null | string, 
   boardProps: BoardObjectProps, 
-  onPositionChange?: (state: StateProps, newPos: Position | null) => void, 
-  positionRegularizer?: (state: StateProps, x: number, y: number) => Position | null, 
+  onPositionChange?: (state: StateProps, newPos: Position | null | RegularizerAction) => void, 
+  positionRegularizer?: (state: StateProps, x: number, y: number) => Position | null | RegularizerAction, 
   // x, y are relative position to the grids
   // return null means that it is invalid
   onClick?: (state: StateProps) => void, 
@@ -34,7 +37,7 @@ const defaultPositionRegularizer = (_: StateProps, x: number, y: number) => {
   return {x: x, y: y};
 }
 
-const defaultOnPositionChange = (_: StateProps, __: Position | null) => {};
+const defaultOnPositionChange = (_: StateProps, __: Position | null | RegularizerAction) => {};
 
 const defaultStateAction = (_: StateProps) => {};
 
@@ -131,7 +134,8 @@ export const State: React.FC<renderStateProps> = (prop) => {
     }
   }, [isMouseDown, handleMouseMove, handleMouseUp]);
 
-  const scaledRadius = myState.radius * scaledGridSize;
+  let scaledRadius = myState.radius * scaledGridSize;
+  if (myState.isDummy) scaledRadius /= 3;
 
   const innerCircle = <div className="absolute border-2 border-black hover:border-blue-600 bg-transparent pointer-events-none"
     style={{
@@ -162,9 +166,10 @@ export const State: React.FC<renderStateProps> = (prop) => {
         height: 2 * scaledRadius, 
         background: isSelected ? `#bfdbfe`: `#eeeeee`, // bg-blue-200
         borderRadius: `100%`,
+        boxShadow: myState.mergedBy ? '0 0 10px 5px rgba(0, 255, 255, 0.7)' : `none`
       }}  
     >
-      { transform.scale >= 0.3 && <svg width={2 * scaledRadius} height={2 * scaledRadius} className="relative select-none" pointerEvents={'none'}>
+      { transform.scale >= 0.3 && !myState.isDummy && <svg width={2 * scaledRadius} height={2 * scaledRadius} className="relative select-none" pointerEvents={'none'}>
         <text
           x={scaledRadius * 0.97}
           y={scaledRadius * 0.97}
@@ -178,8 +183,8 @@ export const State: React.FC<renderStateProps> = (prop) => {
       }
     </div>
 
-  return <div>
+  return !myState.merged && <div>
     {stateCircle}
-    {scaledRadius > 10 && myState.isAccepting && innerCircle}
+    {scaledRadius > 10 && myState.isAccepting && !myState.isDummy && innerCircle}
   </div>
 }
