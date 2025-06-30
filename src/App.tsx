@@ -1,8 +1,7 @@
-import React from 'react';
-import InfiniteBoard from './components/InfiniteBoard';
+import InfiniteBoard, { defaultBoardConfig } from './components/InfiniteBoard';
 
 function App() {
-  return <InfiniteBoard />;
+  return <InfiniteBoard cfg={defaultBoardConfig}/>;
 }
 
 export default App;

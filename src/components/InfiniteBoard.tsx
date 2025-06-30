@@ -1,32 +1,142 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { GridLayer } from './GridLayer';
+import { StateProps } from './State';
+import StateLayer from './StateLayer';
+import { gridRegularizer } from './regularizer';
+import { getUniqueID } from './uuidRecord';
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
 
-interface Transform {
+export interface Transform {
   x: number;
   y: number;
   scale: number;
 }
 
-const InfiniteBoard: React.FC = () => {
+export interface BoardConfig {
+  minScale: number;
+  maxScale: number;
+  gridSize: number;
+  stateRadius: number;
+}
+
+export const defaultBoardConfig: BoardConfig = {
+  minScale: 0.1, 
+  maxScale: 10, 
+  gridSize: 100, 
+  stateRadius: 0.25, 
+};
+
+export interface AutomataGraph {
+  states: Record<string, StateProps>;
+  boardConfig: BoardConfig;
+}
+
+const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig}) => {
   const boardRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isMouseDown, setIsMouseDown] = useState(false);
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [lastTransform, setLastTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
 
-  const minScale = 0.1;
-  const maxScale = 10;
-  const gridSize = 40;
+  const [states, setStates] = useState<Record<string, StateProps>>({});
+  const [selected, setSelected] = useState<null | string>(null);
+
+  const [history, setHistory] = useState<AutomataGraph[]>([{states: {}, boardConfig: cfg}]);
+  const [head, setHead] = useState<number>(0);
+  const [config, setConfig] = useState<BoardConfig>(cfg);
+  const [needUpdate, setNeedUpdate] = useState(false);
+
+  const headRef = useRef(head);
+  const historyRef = useRef(history);
+
+  useEffect(() => {
+    headRef.current = head;
+  }, [head]);
+  
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  const undo = useCallback(() => {
+    if (headRef.current > 0) {
+      setHead(headRef.current - 1);
+      setSelected(null);
+    }
+  }, []);
+
+  const forward = useCallback(() => {
+    if (headRef.current + 1 < historyRef.current.length) {
+      setHead(headRef.current + 1);
+      setSelected(null);
+    }
+  }, []);
+
+  const updateHistory = useCallback(() => {
+    if (needUpdate) {
+      // drop merged states
+      let newStates: Record<string, StateProps> = {};
+      for (const key in states) {
+        if (states[key].merged) {
+          // TODO: update transitions later
+          if (selected === key) {
+            setSelected(states[key].merged);
+          }
+        } else {
+          newStates[key] = {...states[key], mergedBy: false};
+        }
+      }
+      setHistory([...history.slice(0, head + 1), {states: newStates, boardConfig: config}]);
+      setStates(newStates);
+      setHead(head + 1);
+      setNeedUpdate(false);
+    }
+  }, [states, config, history, head, needUpdate]);
+
+  const syncHead = useCallback(() => {
+    setStates(history[head].states);
+    setConfig(history[head].boardConfig);
+  }, [head, history]);
+
+  useEffect(() => {
+    syncHead();
+  }, [head]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      undo();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+      e.preventDefault();
+      forward();
+    }
+  }, []);
+
+  useEffect(() => {
+    updateHistory();
+  }, [needUpdate]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);  
+
+  const minScale = cfg.minScale;
+  const maxScale = cfg.maxScale;
+
+  const onStatesChange = useCallback((changes: Record<string, StateProps>) => {
+    setStates({...states, ...changes});
+  }, [states]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only handle left click
     
-    setIsDragging(true);
+    setIsMouseDown(true);
     setDragStart({ x: e.clientX, y: e.clientY });
     setLastTransform(transform);
     
@@ -36,24 +146,33 @@ const InfiniteBoard: React.FC = () => {
   }, [transform]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging) return;
+    if (!isMouseDown) return;
 
     const deltaX = e.clientX - dragStart.x;
     const deltaY = e.clientY - dragStart.y;
+
+    if (deltaX !== 0 && deltaY !== 0) {
+      setIsDragging(true);
+    }
 
     setTransform({
       ...lastTransform,
       x: lastTransform.x + deltaX,
       y: lastTransform.y + deltaY,
     });
-  }, [isDragging, dragStart, lastTransform]);
+  }, [isMouseDown, dragStart, lastTransform]);
 
   const handleMouseUp = useCallback(() => {
+    if (!isDragging) {
+      setSelected(null);
+      // clear selected
+    }
     setIsDragging(false);
+    setIsMouseDown(false);
     if (boardRef.current) {
       boardRef.current.style.cursor = 'grab';
     }
-  }, []);
+  }, [isDragging]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
@@ -64,7 +183,7 @@ const InfiniteBoard: React.FC = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const delta = e.deltaY * -0.001;
+    const delta = e.deltaY * -0.003;
     const newScale = Math.min(Math.max(transform.scale + delta, minScale), maxScale);
 
     if (newScale === transform.scale) return;
@@ -132,7 +251,7 @@ const InfiniteBoard: React.FC = () => {
   }, [handleWheel]);
 
   useEffect(() => {
-    if (isDragging) {
+    if (isMouseDown) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       document.addEventListener('mouseleave', handleMouseUp);
@@ -143,81 +262,34 @@ const InfiniteBoard: React.FC = () => {
         document.removeEventListener('mouseleave', handleMouseUp);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isMouseDown, handleMouseMove, handleMouseUp]);
 
-  const renderGrid = () => {
-    if (!boardRef.current) return null;
+  const boardProps = {transform: transform, boardRef: boardRef, boardConfig: cfg}
 
-    const rect = boardRef.current.getBoundingClientRect();
-    const scaledGridSize = gridSize * transform.scale;
-    
-    // Calculate the grid offset to create seamless infinite appearance
-    const offsetX = ((transform.x % scaledGridSize) + scaledGridSize) % scaledGridSize;
-    const offsetY = ((transform.y % scaledGridSize) + scaledGridSize) % scaledGridSize;
-    
-    // Calculate how many grid lines we need to fill the screen plus extra buffer
-    const extraLines = 3;
-    const horizontalLines = Math.ceil(rect.width / scaledGridSize) + extraLines * 2;
-    const verticalLines = Math.ceil(rect.height / scaledGridSize) + extraLines * 2;
-    
-    const lines = [];
-    let key = 0;
-
-    // Vertical lines
-    for (let i = -extraLines; i <= horizontalLines; i++) {
-      const x = offsetX + i * scaledGridSize - extraLines * scaledGridSize;
-      
-      // Calculate the actual grid coordinate for this line
-      const gridX = Math.round((x - transform.x) / scaledGridSize) * gridSize;
-      const isMainLine = gridX === 0;
-      
-      lines.push(
-        <line
-          key={`v-${key++}`}
-          x1={x}
-          y1={-extraLines * scaledGridSize}
-          x2={x}
-          y2={rect.height + extraLines * scaledGridSize}
-          stroke={isMainLine ? '#3b82f6' : '#e5e7eb'}
-          strokeWidth={isMainLine ? 2 : 1}
-          opacity={Math.min(1, Math.max(0.2, transform.scale * 0.8))}
-        />
-      );
-    }
-
-    // Horizontal lines
-    for (let i = -extraLines; i <= verticalLines; i++) {
-      const y = offsetY + i * scaledGridSize - extraLines * scaledGridSize;
-      
-      // Calculate the actual grid coordinate for this line
-      const gridY = Math.round((y - transform.y) / scaledGridSize) * gridSize;
-      const isMainLine = gridY === 0;
-      
-      lines.push(
-        <line
-          key={`h-${key++}`}
-          x1={-extraLines * scaledGridSize}
-          y1={y}
-          x2={rect.width + extraLines * scaledGridSize}
-          y2={y}
-          stroke={isMainLine ? '#3b82f6' : '#e5e7eb'}
-          strokeWidth={isMainLine ? 2 : 1}
-          opacity={Math.min(1, Math.max(0.2, transform.scale * 0.8))}
-        />
-      );
-    }
-
-    return lines;
-  };
-
-  const getOriginPosition = () => {
-    return {
-      x: transform.x,
-      y: transform.y
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const scaledGridSize = transform.scale * cfg.gridSize;
+    const newRelativePostion = {
+      x: (e.clientX - transform.x) / scaledGridSize,
+      y: (e.clientY - transform.y) / scaledGridSize
     };
-  };
-
-  const origin = getOriginPosition();
+    const result = gridRegularizer(null, states, newRelativePostion.x, newRelativePostion.y);
+    if (result) {
+      const newID = getUniqueID(states);
+      const newState: StateProps = {
+        id: newID, 
+        label: `q_${newID[0]}`, 
+        position: result, 
+        radius: cfg.stateRadius, 
+        isAccepting: false, 
+        isDummy: false, 
+        merged: null, 
+        mergedBy: false, 
+      };
+      setStates({...states, ...{[newID]: newState}});
+      setNeedUpdate(true);
+    }
+  }, [states, transform, cfg]);
 
   return (
     <div className="w-full h-screen relative overflow-hidden bg-gray-50">
@@ -260,6 +332,7 @@ const InfiniteBoard: React.FC = () => {
           <div>• Drag to pan around</div>
           <div>• Scroll to zoom in/out</div>
           <div>• Use controls to reset</div>
+          <div> {`HEAD: ${head}`}</div>
         </div>
       </div>
 
@@ -268,6 +341,7 @@ const InfiniteBoard: React.FC = () => {
         ref={boardRef}
         className="w-full h-full cursor-grab select-none relative"
         onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
         style={{
           cursor: isDragging ? 'grabbing' : 'grab',
         }}
@@ -278,37 +352,18 @@ const InfiniteBoard: React.FC = () => {
             overflow: 'visible'
           }}
         >
-          {renderGrid()}
-          
-          {/* Origin marker - only show if it's visible on screen */}
-          {origin.x >= -20 && origin.x <= (boardRef.current?.clientWidth || 0) + 20 &&
-           origin.y >= -20 && origin.y <= (boardRef.current?.clientHeight || 0) + 20 && (
-            <>
-              <circle
-                cx={origin.x}
-                cy={origin.y}
-                r={4}
-                fill="#3b82f6"
-                opacity={Math.min(1, transform.scale)}
-              />
-              
-              {/* Coordinate labels */}
-              {transform.scale > 0.5 && (
-                <text
-                  x={origin.x + 8}
-                  y={origin.y - 8}
-                  fontSize={12}
-                  fill="#6b7280"
-                  className="select-none pointer-events-none"
-                >
-                  (0, 0)
-                </text>
-              )}
-            </>
-          )}
+          {<GridLayer transform={transform} boardRef={boardRef} boardConfig={cfg}/>}
         </svg>
       </div>
-
+      <StateLayer 
+        states={states} 
+        boardProps={boardProps} 
+        onStatesChange={onStatesChange} 
+        selected={selected} 
+        setSelected={setSelected}
+        setStates={setStates}
+        callForUpdate={() => setNeedUpdate(true)}
+      />
       {/* Loading state when dragging */}
       {isDragging && (
         <div className="absolute inset-0 pointer-events-none">
