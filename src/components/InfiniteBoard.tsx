@@ -5,6 +5,7 @@ import { StateProps } from './State';
 import StateLayer from './StateLayer';
 import { gridRegularizer } from './regularizer';
 import { getUniqueID } from './uuidRecord';
+import { Transition, TransitionProps } from './Transition';
 
 export interface Point {
   x: number;
@@ -54,6 +55,12 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
 
   const headRef = useRef(head);
   const historyRef = useRef(history);
+
+  const getState = useCallback((id: string) => {
+    if (Object.prototype.hasOwnProperty.call(states, id)) {
+      return states[id];
+    } else return null;
+  }, [states]);
 
   useEffect(() => {
     headRef.current = head;
@@ -291,6 +298,23 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }, [states, transform, cfg]);
 
+  const getTransitionDemo = useCallback(() => {
+    const stateIDs = Object.keys(states);
+    if (stateIDs.length < 2) return null;
+    const transition: TransitionProps = {
+      fromID: stateIDs[0], 
+      toID: stateIDs[1], 
+      id: "000", 
+      label: ""
+    };
+    return <Transition 
+      transition={transition}
+      selected={selected}
+      boardProps={boardProps}
+      getState={getState}
+    />
+  }, [states, selected, boardProps, getState]);
+
   return (
     <div className="w-full h-screen relative overflow-hidden bg-gray-50">
       {/* Controls */}
@@ -355,6 +379,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           {<GridLayer transform={transform} boardRef={boardRef} boardConfig={cfg}/>}
         </svg>
       </div>
+      {getTransitionDemo()}
       <StateLayer 
         states={states} 
         boardProps={boardProps} 
