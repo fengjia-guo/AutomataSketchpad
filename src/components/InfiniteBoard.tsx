@@ -312,6 +312,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
       selected={selected}
       boardProps={boardProps}
       getState={getState}
+      onClick={(t) => setSelected(t.id)}
     />
   }, [states, selected, boardProps, getState]);
 

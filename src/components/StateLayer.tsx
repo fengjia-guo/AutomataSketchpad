@@ -83,10 +83,6 @@ export const StateLayer: React.FC<StateLayerProps> = ({
     }
   }, [selected]);
 
-  const StateEditor = <div className="absolute bottom-3 left-3 right-3 h-[25vh] bg-white rounded-xl shadow-xl p-4">
-    { selected ? states[selected].id : <span>edit here</span>}
-  </div>
-
   return (
     <div>
       {Object.keys(states).map((stateId, index) => (
@@ -104,7 +100,6 @@ export const StateLayer: React.FC<StateLayerProps> = ({
           />
         </div>
       ))}
-      {StateEditor}
     </div>
   );
 };

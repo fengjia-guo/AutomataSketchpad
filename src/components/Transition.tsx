@@ -2,9 +2,11 @@ import { Position } from "./State";
 import { BoardObjectProps } from "./GridLayer"
 import { StateProps } from "./State";
 import { RegularizerAction } from "./regularizer";
-import React from "react";
+import React, { useState } from "react";
 import { defaultBoardConfig } from "./InfiniteBoard";
 import { getRadius, interpolate } from "./util";
+
+const BLUE_600 = "#2563eb";
 
 export interface TransitionProps {
 	id: string, 
@@ -39,6 +41,8 @@ export const Transition: React.FC<renderTransitionProps> = ({
 	callForUpdate = () => {}
 }) => {
 
+	const [hovering, setHovering] = useState(false);
+
 	const fromState = getState(transition.fromID);
 	const toState = getState(transition.toID);
 	if (!fromState || !toState) {
@@ -68,18 +72,25 @@ export const Transition: React.FC<renderTransitionProps> = ({
 	const displayFromPos = getDisplayPosition(interpolate(fromState.position, toState.position, fromRatio));
 	const displayToPos = getDisplayPosition(interpolate(toState.position, fromState.position, toRatio));
 	
-	return <svg width={"100%"} height={"100%"} style={{pointerEvents: `none`, position: 'absolute', left: 0, top: 0}}>
+	const isSelected = selected && selected === transition.id;
+
+	const markerScale = scale / (hovering ? 1.25 : 1);
+
+	const svg = <svg width={"100%"} height={"100%"} style={{pointerEvents: `none`, position: 'absolute', left: 0, top: 0}}>
 		<defs>
 			<marker
 				id="arrowhead"
-				markerWidth={10 * scale}
-				markerHeight={7 * scale}
-				refX={10 * scale}
-				refY={3.5 * scale}
+				markerWidth={10 * markerScale}
+				markerHeight={7 * markerScale}
+				refX={10 * markerScale}
+				refY={3.5 * markerScale}
 				orient="auto"
 				markerUnits="strokeWidth"
 			>
-				<polygon points={`0 0, ${10 * scale} ${3.5 * scale}, 0 ${7 * scale}`} fill="black" />
+				<polygon 
+					points={`0 0, ${10 * markerScale} ${3.5 * markerScale}, 0 ${7 * markerScale}`} 
+					fill={isSelected ? BLUE_600 : "black"} 
+				/>
 			</marker>
 		</defs>
 		<line 
@@ -87,9 +98,14 @@ export const Transition: React.FC<renderTransitionProps> = ({
 			y1={displayFromPos.y}
 			x2={displayToPos.x}
 			y2={displayToPos.y}
-			stroke="black"
-			strokeWidth={"2"}
+			stroke={isSelected ? BLUE_600 : "black"}
+			strokeWidth={hovering ? 3 : 2}
 			markerEnd="url(#arrowhead)"
+			style={{pointerEvents: 'all'}}
+			onMouseEnter={() => setHovering(true)}
+			onMouseLeave={() => setHovering(false)}
+			onClick={() => onClick(transition)}
 		/>
 	</svg>
+	return svg;
 };
