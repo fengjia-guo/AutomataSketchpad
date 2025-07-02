@@ -11,6 +11,8 @@ export interface StateLayerProps {
   onStatesChange?: (_: Record<string, StateProps>) => void, 
   setStates?: (_: Record<string, StateProps>) => void, 
   callForUpdate?: () => void, 
+  onStateClicked?: (_: StateProps) => void, 
+  onStateDeleted?: (_: StateProps) => void, 
 }
 
 export const StateLayer: React.FC<StateLayerProps> = ({
@@ -21,6 +23,8 @@ export const StateLayer: React.FC<StateLayerProps> = ({
   onStatesChange = () => {}, 
   setStates = () => {}, 
   callForUpdate = () => {}, 
+  onStateClicked = () => {}, 
+  onStateDeleted = () => {}, 
 }) => {
   
   const dragRegularizer = useCallback((state: StateProps, x: number, y: number) => {
@@ -71,7 +75,7 @@ export const StateLayer: React.FC<StateLayerProps> = ({
     }
     setSelected(null);
     setStates(remainingStates);
-    callForUpdate();
+    onStateDeleted(state);
   }, [states]);
 
   const handleDelete = useCallback((state: StateProps) => {
@@ -83,10 +87,6 @@ export const StateLayer: React.FC<StateLayerProps> = ({
     }
   }, [selected]);
 
-  const StateEditor = <div className="absolute bottom-3 left-3 right-3 h-[25vh] bg-white rounded-xl shadow-xl p-4">
-    { selected ? states[selected].id : <span>edit here</span>}
-  </div>
-
   return (
     <div>
       {Object.keys(states).map((stateId, index) => (
@@ -97,14 +97,13 @@ export const StateLayer: React.FC<StateLayerProps> = ({
             boardProps={boardProps}
             positionRegularizer={dragRegularizer}
             onPositionChange={onPositionChange}
-            onClick={(s) => setSelected(s.id)}
+            onClick={onStateClicked}
             onDoubleClick={onDoubleClick}
             onDelete={handleDelete}
             callForUpdate={callForUpdate}
           />
         </div>
       ))}
-      {StateEditor}
     </div>
   );
 };
