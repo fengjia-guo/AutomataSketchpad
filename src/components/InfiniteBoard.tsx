@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Move, ZoomIn, ZoomOut, RotateCcw, MoveRight } from 'lucide-react';
+import { Move, ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload } from 'lucide-react';
 import { GridLayer } from './GridLayer';
 import { StateProps } from './State';
 import StateLayer from './StateLayer';
@@ -381,6 +381,45 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   };
 
+  const handleStorage = () => {
+    const data = { states, transitions };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'automata.json';
+    a.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const handleUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const parsed = JSON.parse(text);
+        if (!parsed.states || !parsed.transitions) {
+          alert('Invalid automata file.');
+          return;
+        }
+        setStates(parsed.states);
+        setTransitions(parsed.transitions);
+        setSelected(null);
+        setNeedUpdate(true);
+      } catch (err) {
+        alert('Invalid automata file.');
+      }
+    };
+    input.click();
+  };
+
   return (
     <div className="w-full h-screen relative overflow-hidden bg-gray-50">
       {/* Controls */}
@@ -406,12 +445,28 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         >
           <RotateCcw size={20} />
         </button>
+        <div className="v-divider border-b-2" />
         <button
           onClick={() => setCreateTransition(prev => !prev)}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
           title="Create Transition"
         >
           <MoveRight size={20} color={createTransition ? "#2563eb" : "black"}/>
+        </button>
+        <div className="v-divider border-b-2" />
+        <button
+          onClick={() => handleStorage()}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Save"
+        >
+          <Save size={20} />
+        </button>
+        <button
+          onClick={() => handleUpload()}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Upload"
+        >
+          <Upload size={20} />
         </button>
       </div>
 
