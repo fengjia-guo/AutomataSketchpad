@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Move, ZoomIn, ZoomOut, RotateCcw, MoveRight } from 'lucide-react';
 import { GridLayer } from './GridLayer';
 import { StateProps } from './State';
 import StateLayer from './StateLayer';
 import { gridRegularizer } from './regularizer';
 import { getUniqueID } from './uuidRecord';
-import { Transition, TransitionProps } from './Transition';
+import { TransitionProps } from './Transition';
+import { TransitionLayer } from './TransitionLayer';
 
 export interface Point {
   x: number;
@@ -34,6 +35,7 @@ export const defaultBoardConfig: BoardConfig = {
 
 export interface AutomataGraph {
   states: Record<string, StateProps>;
+  transitions: Record<string, TransitionProps>;
   boardConfig: BoardConfig;
 }
 
@@ -46,9 +48,10 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [lastTransform, setLastTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
 
   const [states, setStates] = useState<Record<string, StateProps>>({});
+  const [transitions, setTransitions] = useState<Record<string, TransitionProps>>({});
   const [selected, setSelected] = useState<null | string>(null);
 
-  const [history, setHistory] = useState<AutomataGraph[]>([{states: {}, boardConfig: cfg}]);
+  const [history, setHistory] = useState<AutomataGraph[]>([{states: {}, transitions: {}, boardConfig: cfg}]);
   const [head, setHead] = useState<number>(0);
   const [config, setConfig] = useState<BoardConfig>(cfg);
   const [needUpdate, setNeedUpdate] = useState(false);
@@ -56,11 +59,16 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const headRef = useRef(head);
   const historyRef = useRef(history);
 
-  const getState = useCallback((id: string) => {
+  const [createTransition, setCreateTransition] = useState(false);
+
+  const createTransitionRef = useRef(createTransition);
+  const selectedRef = useRef(selected);
+
+  const getState = (id: string) => {
     if (Object.prototype.hasOwnProperty.call(states, id)) {
       return states[id];
     } else return null;
-  }, [states]);
+  };
 
   useEffect(() => {
     headRef.current = head;
@@ -69,6 +77,14 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   useEffect(() => {
     historyRef.current = history;
   }, [history]);
+
+  useEffect(() => {
+    createTransitionRef.current = createTransition;
+  }, [createTransition]);
+
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
 
   const undo = useCallback(() => {
     if (headRef.current > 0) {
@@ -88,9 +104,20 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     if (needUpdate) {
       // drop merged states
       let newStates: Record<string, StateProps> = {};
+      let newTransitions: Record<string, TransitionProps> = structuredClone(transitions);
       for (const key in states) {
         if (states[key].merged) {
           // TODO: update transitions later
+          for (const transitionID in transitions) {
+            let newTransition = structuredClone(transitions[transitionID]);
+            if (transitions[transitionID].fromID === key) {
+              newTransition.fromID = states[key].merged;
+            }
+            if (transitions[transitionID].toID === key) {
+              newTransition.toID = states[key].merged;
+            }
+            newTransitions[transitionID] = newTransition;
+          }
           if (selected === key) {
             setSelected(states[key].merged);
           }
@@ -98,21 +125,26 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           newStates[key] = {...states[key], mergedBy: false};
         }
       }
-      setHistory([...history.slice(0, head + 1), {states: newStates, boardConfig: config}]);
-      setStates(newStates);
+      setHistory(prevHistory => [
+        ...prevHistory.slice(0, head + 1),
+        { states: newStates, transitions: newTransitions, boardConfig: config }
+      ]);
+      // setStates(newStates);
+      // setTransitions(newTransitions);
       setHead(head + 1);
       setNeedUpdate(false);
     }
-  }, [states, config, history, head, needUpdate]);
+  }, [states, transitions, config, history, head, needUpdate]);
 
   const syncHead = useCallback(() => {
     setStates(history[head].states);
+    setTransitions(history[head].transitions);
     setConfig(history[head].boardConfig);
   }, [head, history]);
 
   useEffect(() => {
     syncHead();
-  }, [head]);
+  }, [head, history]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
@@ -172,6 +204,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const handleMouseUp = useCallback(() => {
     if (!isDragging) {
       setSelected(null);
+      setCreateTransition(false);
       // clear selected
     }
     setIsDragging(false);
@@ -298,23 +331,54 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }, [states, transform, cfg]);
 
-  const getTransitionDemo = useCallback(() => {
-    const stateIDs = Object.keys(states);
-    if (stateIDs.length < 2) return null;
-    const transition: TransitionProps = {
-      fromID: stateIDs[0], 
-      toID: stateIDs[1], 
-      id: "000", 
-      label: ""
-    };
-    return <Transition 
-      transition={transition}
-      selected={selected}
-      boardProps={boardProps}
-      getState={getState}
-      onClick={(t) => setSelected(t.id)}
-    />
-  }, [states, selected, boardProps, getState]);
+  const handleTransitionDelete = (t: TransitionProps) => {
+    let newTransitions: Record<string, TransitionProps> = {};
+    for (const transitionID in transitions) {
+      if (transitionID !== t.id) {
+        newTransitions[transitionID] = transitions[transitionID];
+      }
+    }
+    setTransitions(newTransitions);
+    setNeedUpdate(true);
+  };
+  
+  const handleStateDelete = (s: StateProps) => {
+    let newTransitions: Record<string, TransitionProps> = {};
+    for (const transitionID in transitions) {
+      const transition = transitions[transitionID];
+      if (transition.fromID !== s.id && transition.toID !== s.id) {
+        newTransitions[transitionID] = transitions[transitionID];
+      }
+    }
+    setTransitions(newTransitions);
+    setNeedUpdate(true);
+  };
+  
+  const handleCreateTransition = (s: StateProps) => {
+    if (selectedRef.current && createTransitionRef.current) {
+      const newTransitionID = getUniqueID(transitions);
+      const newTransition: TransitionProps = {
+        fromID: selectedRef.current, 
+        toID: s.id, 
+        id: newTransitionID, 
+        label: ""
+      };
+      setTransitions({...transitions, ...{[newTransitionID]: newTransition}});
+      setSelected(s.id);
+      setNeedUpdate(true);
+    } else {
+      console.error('selected is null');
+    }
+  };
+
+  const handleStateClicked = (s: StateProps) => {
+    if (!createTransitionRef.current) return setSelected(s.id);
+    if (selectedRef.current) {
+      handleCreateTransition(s);
+    } else {
+      setSelected(s.id);
+    }
+  };
 
   return (
     <div className="w-full h-screen relative overflow-hidden bg-gray-50">
@@ -340,6 +404,13 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           title="Reset View"
         >
           <RotateCcw size={20} />
+        </button>
+        <button
+          onClick={() => setCreateTransition(prev => !prev)}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Create Transition"
+        >
+          <MoveRight size={20} color={createTransition ? "#2563eb" : "black"}/>
         </button>
       </div>
 
@@ -380,7 +451,14 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           {<GridLayer transform={transform} boardRef={boardRef} boardConfig={cfg}/>}
         </svg>
       </div>
-      {getTransitionDemo()}
+      <TransitionLayer 
+        transitions={transitions}
+        selected={selected}
+        boardProps={boardProps}
+        getState={getState}
+        onClick={(t) => setSelected(t.id)}
+        onDelete={handleTransitionDelete}
+      />
       <StateLayer 
         states={states} 
         boardProps={boardProps} 
@@ -389,6 +467,8 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         setSelected={setSelected}
         setStates={setStates}
         callForUpdate={() => setNeedUpdate(true)}
+        onStateClicked={handleStateClicked}
+        onStateDeleted={handleStateDelete}
       />
       {/* Loading state when dragging */}
       {isDragging && (
