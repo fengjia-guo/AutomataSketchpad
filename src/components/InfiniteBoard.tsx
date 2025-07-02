@@ -356,6 +356,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   
   const handleCreateTransition = (s: StateProps) => {
     if (selectedRef.current && createTransitionRef.current) {
+      if (!Object.keys(states).includes(selectedRef.current)) return setSelected(s.id); 
       const newTransitionID = getUniqueID(transitions);
       const newTransition: TransitionProps = {
         fromID: selectedRef.current, 
