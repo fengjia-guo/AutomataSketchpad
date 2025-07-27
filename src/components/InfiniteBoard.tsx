@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Move, ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3 } from 'lucide-react';
 import { GridLayer } from './GridLayer';
 import { StateProps } from './State';
 import StateLayer from './StateLayer';
@@ -46,6 +46,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [lastTransform, setLastTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
+  const [showGrid, setShowGrid] = useState(true);
 
   const [states, setStates] = useState<Record<string, StateProps>>({});
   const [transitions, setTransitions] = useState<Record<string, TransitionProps>>({});
@@ -445,6 +446,13 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         >
           <RotateCcw size={20} />
         </button>
+        <button
+          onClick={() => setShowGrid((prev) => !prev)}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title={`${showGrid ? "Hide" : `Show`} Grid`}
+        >
+          <Grid3X3 size={20} color={`${showGrid ? "black" : "gray"}`}/>
+        </button>
         <div className="v-divider border-b-2" />
         <button
           onClick={() => setCreateTransition(prev => !prev)}
@@ -470,24 +478,6 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         </button>
       </div>
 
-      {/* Info Panel */}
-      <div className="absolute top-4 right-4 z-10 bg-white rounded-lg shadow-lg p-4 text-sm text-gray-600">
-        <div className="flex items-center gap-2 mb-2">
-          <Move size={16} />
-          <span className="font-medium">Infinite Grid Board</span>
-        </div>
-        <div className="space-y-1">
-          <div>Zoom: {(transform.scale * 100).toFixed(0)}%</div>
-          <div>Position: ({Math.round(-transform.x / transform.scale)}, {Math.round(-transform.y / transform.scale)})</div>
-        </div>
-        <div className="mt-3 pt-3 border-t text-xs space-y-1">
-          <div>• Drag to pan around</div>
-          <div>• Scroll to zoom in/out</div>
-          <div>• Use controls to reset</div>
-          <div> {`HEAD: ${head}`}</div>
-        </div>
-      </div>
-
       {/* Main Board */}
       <div
         ref={boardRef}
@@ -504,7 +494,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
             overflow: 'visible'
           }}
         >
-          {<GridLayer transform={transform} boardRef={boardRef} boardConfig={cfg}/>}
+          {showGrid && <GridLayer transform={transform} boardRef={boardRef} boardConfig={cfg}/>}
         </svg>
       </div>
       <TransitionLayer 
