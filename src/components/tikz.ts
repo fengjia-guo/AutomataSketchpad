@@ -1,12 +1,13 @@
-import { AutomataGraph } from "./InfiniteBoard";
 import { StateProps } from "./State";
 import { TransitionProps } from "./Transition";
+
+export type MapOption = number | "identity" | "rearrange";
 
 export const getTikzStateType = (prop: StateProps) => {
   return prop.isAccepting ? `state, accepting` : `state`
 }
 
-export const getIDMap = (states: Record<string, StateProps>, option: number | "identity" | "rearrange") => {
+export const getIDMap = (states: Record<string, StateProps>, option: MapOption) => {
   let mapping: Record<string, string> = {};
   let i = 0;
   for (const key in states) {
@@ -54,7 +55,7 @@ export const getTikzPaths = (transitions: Record<string, TransitionProps>, mappi
   return paths;
 }
 
-export const getTikzFromAutomata = (states: Record<string, StateProps>, transitions: Record<string, TransitionProps>, option: number | "identity" | "rearrange" = "rearrange") => {
+export const getTikzFromAutomata = (states: Record<string, StateProps>, transitions: Record<string, TransitionProps>, option: MapOption = "rearrange") => {
   const mapping = getIDMap(states, option);
   const header = "\\begin{tikzpicture}[shorten >=1pt, node distance=5cm, on grid, auto]\n";
   const footer = "\\end{tikzpicture}";
