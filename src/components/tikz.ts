@@ -24,7 +24,7 @@ export const getIDMap = (states: Record<string, StateProps>, option: MapOption) 
 }
 
 export const getTikzStateString = (prop: StateProps, mapping: Record<string, string>) => {
-  return `\\node[${getTikzStateType(prop)}] (${mapping[prop.id]}) at (${prop.position.x},${prop.position.y}) {${prop.label}};\n`;
+  return `\\node[${getTikzStateType(prop)}] (${mapping[prop.id]}) at (${prop.position.x}, -${prop.position.y}) {$${prop.label}$};\n`;
 }
 
 export const getTikzNodes = (states: Record<string, StateProps>, mapping: Record<string, string>) => {

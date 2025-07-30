@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from "react"
 import { BoardObjectProps } from "./GridLayer"
 import { defaultBoardConfig, Point } from "./InfiniteBoard"
 import { RegularizerAction } from "./regularizer"
+import katex from "katex"
 
 export interface Position {
     x: number, 
@@ -154,7 +155,12 @@ export const State: React.FC<renderStateProps> = (prop) => {
     }
   }, [isSelected, myState, onDelete]);
 
-  const stateCircle = <div className="absolute border-2 border-black hover:border-blue-600 bg-blue-200" 
+  const katexHTML = katex.renderToString(myState.label, {
+    throwOnError: false,
+    displayMode: false,
+  });
+
+  const stateCircle = <div className="absolute border-2 border-black hover:border-blue-600 bg-blue-200 items-center" 
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
       tabIndex={0}
@@ -169,18 +175,16 @@ export const State: React.FC<renderStateProps> = (prop) => {
         boxShadow: myState.mergedBy ? '0 0 10px 5px rgba(0, 255, 255, 0.7)' : `none`
       }}  
     >
-      { transform.scale >= 0.3 && !myState.isDummy && <svg width={2 * scaledRadius} height={2 * scaledRadius} className="relative select-none" pointerEvents={'none'}>
-        <text
-          x={scaledRadius * 0.97}
-          y={scaledRadius * 0.97}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontSize={14 * Math.min(1, transform.scale)}
-        >
-          {myState.label}
-        </text>
-      </svg>
-      }
+      {transform.scale >= 0.3 && !myState.isDummy && (
+        <div
+          className="flex justify-center items-center relative select-none w-full h-full"
+          dangerouslySetInnerHTML={{ __html: katexHTML }}
+          style={{
+            transform: `scale(${Math.min(1, transform.scale)})`,
+            transformOrigin: 'center',
+          }}
+        />
+      )}
     </div>
 
   return !myState.merged && <div>
