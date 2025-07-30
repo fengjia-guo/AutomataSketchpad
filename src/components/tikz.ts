@@ -23,28 +23,28 @@ export const getIDMap = (states: Record<string, StateProps>, option: MapOption) 
   return mapping;
 }
 
-export const getTikzStateString = (prop: StateProps, mapping: Record<string, string>) => {
-  return `\\node[${getTikzStateType(prop)}] (${mapping[prop.id]}) at (${prop.position.x}, -${prop.position.y}) {$${prop.label}$};\n`;
+export const getTikzStateString = (prop: StateProps, mapping: Record<string, string>, scale: number = 1) => {
+  return `\\node[${getTikzStateType(prop)}] (${mapping[prop.id]}) at (${prop.position.x * scale}, ${-prop.position.y * scale}) {$ ${prop.label} $};\n`;
 }
 
-export const getTikzNodes = (states: Record<string, StateProps>, mapping: Record<string, string>) => {
+export const getTikzNodes = (states: Record<string, StateProps>, mapping: Record<string, string>, scale: number = 1) => {
   let nodes = "";
   for (const key in states) {
-    nodes += getTikzStateString(states[key], mapping);
+    nodes += getTikzStateString(states[key], mapping, scale);
   }
   return nodes;
 }
 
 export const getTikzTransitionString = (prop: TransitionProps, mapping: Record<string, string>) => {
   if (prop.fromID === prop.toID) {
-    return `(${mapping[prop.fromID]}) edge[loop above] node {${prop.label}} ()`;
+    return `(${mapping[prop.fromID]}) edge[loop above] node {$ ${prop.label} $} ()`;
   } else {
-    return `(${mapping[prop.fromID]}) edge node {${prop.label}} (${mapping[prop.toID]})`
+    return `(${mapping[prop.fromID]}) edge node {$ ${prop.label} $} (${mapping[prop.toID]})`
   }
 }
 
 export const getTikzPaths = (transitions: Record<string, TransitionProps>, mapping: Record<string, string>) => {
-  let paths = "path[->]";
+  let paths = "\\path[->]";
   for (const key in transitions) {
     paths += "\n";
     const prop = transitions[key];
@@ -55,9 +55,9 @@ export const getTikzPaths = (transitions: Record<string, TransitionProps>, mappi
   return paths;
 }
 
-export const getTikzFromAutomata = (states: Record<string, StateProps>, transitions: Record<string, TransitionProps>, option: MapOption = "rearrange") => {
+export const getTikzFromAutomata = (states: Record<string, StateProps>, transitions: Record<string, TransitionProps>, option: MapOption = "rearrange", scale: number = 1) => {
   const mapping = getIDMap(states, option);
   const header = "\\begin{tikzpicture}[shorten >=1pt, node distance=5cm, on grid, auto]\n";
   const footer = "\\end{tikzpicture}";
-  return header + getTikzNodes(states, mapping) + getTikzPaths(transitions, mapping) + footer;
+  return header + getTikzNodes(states, mapping, scale) + getTikzPaths(transitions, mapping) + footer;
 }
