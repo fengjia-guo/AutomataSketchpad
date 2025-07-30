@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code } from 'lucide-react';
 import { GridLayer } from './GridLayer';
 import { StateProps } from './State';
 import StateLayer from './StateLayer';
@@ -7,6 +7,7 @@ import { gridRegularizer } from './regularizer';
 import { getUniqueID } from './uuidRecord';
 import { TransitionProps } from './Transition';
 import { TransitionLayer } from './TransitionLayer';
+import { TikzExporter } from './TikzExporter';
 
 export interface Point {
   x: number;
@@ -47,6 +48,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
   const [lastTransform, setLastTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
   const [showGrid, setShowGrid] = useState(true);
+  const [showTikzExporter, setShowTikzExporter] = useState(false);
 
   const [states, setStates] = useState<Record<string, StateProps>>({});
   const [transitions, setTransitions] = useState<Record<string, TransitionProps>>({});
@@ -205,6 +207,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const handleMouseUp = useCallback(() => {
     if (!isDragging) {
       setSelected(null);
+      setShowTikzExporter(false);
       setCreateTransition(false);
       // clear selected
     }
@@ -421,6 +424,12 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     input.click();
   };
 
+  const handleTikzExport = () => {
+    setShowTikzExporter(true);
+  }
+
+  const tikz = <TikzExporter states={states} transitions={transitions} boardConfig={config}/>
+
   return (
     <div className="w-full h-screen relative overflow-hidden bg-gray-50">
       {/* Controls */}
@@ -470,6 +479,13 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           <Save size={20} />
         </button>
         <button
+          onClick={() => handleTikzExport()}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Export as Tikz"
+        >
+          <Code size={20} />
+        </button>
+        <button
           onClick={() => handleUpload()}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
           title="Upload"
@@ -516,6 +532,11 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         onStateClicked={handleStateClicked}
         onStateDeleted={handleStateDelete}
       />
+      {showTikzExporter && (
+        <div className="absolute inset-0 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          {tikz}
+        </div>
+      )}
       {/* Loading state when dragging */}
       {isDragging && (
         <div className="absolute inset-0 pointer-events-none">
