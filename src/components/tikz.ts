@@ -27,10 +27,11 @@ export const getTikzStateString = (prop: StateProps, mapping: Record<string, str
   return `\\node[${getTikzStateType(prop)}] (${mapping[prop.id]}) at (${prop.position.x * scale}, ${-prop.position.y * scale}) {$ ${prop.label} $};\n`;
 }
 
-export const getTikzNodes = (states: Record<string, StateProps>, mapping: Record<string, string>, scale: number = 1) => {
+export const getTikzNodes = (states: Record<string, StateProps>, mapping: Record<string, string>, scale: number = 1, dummy: boolean = false) => {
   let nodes = "";
   for (const key in states) {
-    nodes += getTikzStateString(states[key], mapping, scale);
+    if (dummy || !states[key].isDummy) 
+      nodes += getTikzStateString(states[key], mapping, scale);
   }
   return nodes;
 }
@@ -43,21 +44,30 @@ export const getTikzTransitionString = (prop: TransitionProps, mapping: Record<s
   }
 }
 
-export const getTikzPaths = (transitions: Record<string, TransitionProps>, mapping: Record<string, string>) => {
+export const getTikzPaths = (transitions: Record<string, TransitionProps>, mapping: Record<string, string>, 
+  dummy: boolean, states: Record<string, StateProps>
+) => {
   let paths = "\\path[->]";
   for (const key in transitions) {
-    paths += "\n";
     const prop = transitions[key];
+    const flag = states[prop.fromID].isDummy || states[prop.toID].isDummy;
+    if (!dummy && flag) continue;
     const tikzString = getTikzTransitionString(prop, mapping);
+    paths += "\n";
     paths += tikzString;
   }
   paths += ";\n";
   return paths;
 }
 
-export const getTikzFromAutomata = (states: Record<string, StateProps>, transitions: Record<string, TransitionProps>, option: MapOption = "rearrange", scale: number = 1) => {
+export const getTikzFromAutomata = (states: Record<string, StateProps>, 
+  transitions: Record<string, TransitionProps>, 
+  option: MapOption = "rearrange", 
+  scale: number = 1, 
+  dummy: boolean = false, 
+) => {
   const mapping = getIDMap(states, option);
   const header = "\\begin{tikzpicture}[shorten >=1pt, node distance=5cm, on grid, auto]\n";
   const footer = "\\end{tikzpicture}";
-  return header + getTikzNodes(states, mapping, scale) + getTikzPaths(transitions, mapping) + footer;
+  return header + getTikzNodes(states, mapping, scale, dummy) + getTikzPaths(transitions, mapping, dummy, states) + footer;
 }

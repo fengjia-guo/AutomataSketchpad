@@ -7,7 +7,8 @@ export const TikzExporter: React.FC<AutomataGraph> = ({states, transitions}) => 
   const [option, setOption] = useState<MapOption>("rearrange");
   const [showOptions, setShowOptions] = useState(false);
   const [scale, setScale] = useState<string>("1");
-  const tikzCode = getTikzFromAutomata(states, transitions, option, parseFloat(scale));
+  const [includeDummy, setIncludeDummy] = useState(false);
+  const tikzCode = getTikzFromAutomata(states, transitions, option, parseFloat(scale), includeDummy);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(tikzCode);
@@ -47,9 +48,20 @@ export const TikzExporter: React.FC<AutomataGraph> = ({states, transitions}) => 
     />
   </div>
 
+  const dummyOptionPanel = <div className="flex justify-between">
+    <span className="text-sm"> Include Dummy States </span>
+    <input
+      type="checkbox"
+      checked={includeDummy}
+      onChange={(e) => {setIncludeDummy(e.target.checked)}}
+      className="text-sm rounded-sm"
+    />
+  </div>
+
   const optionPanels = <div className="flex flex-col gap-y-2">
     {mapOptionPanel}
     {scaleOptionPanel}
+    {dummyOptionPanel}
   </div>
 
   return (
