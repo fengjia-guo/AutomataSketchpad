@@ -99,7 +99,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
 
   useEffect(() => {
     usingToolRef.current = usingTool;
-  }, [usingTool])
+  }, [usingTool]);
 
   const undo = useCallback(() => {
     if (headRef.current > 0) {
@@ -220,6 +220,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     if (!isDragging) {
       setSelected(null);
       setShowTikzExporter(false);
+      setShowToolManager(false);
       setCreateTransition(false);
       // clear selected
     }
@@ -322,11 +323,19 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
 
   useEffect(() => {
     if (usingTool) setCreateTransition(false);
-  }, [usingTool])
+  }, [usingTool]);
 
   useEffect(() => {
     if (createTransition) setUsingTool(false);
-  }, [createTransition])
+  }, [createTransition]);
+
+  useEffect(() => {
+    if (showTikzExporter) setShowToolManager(false);
+  }, [showTikzExporter]);
+
+  useEffect(() => {
+    if (showToolManager) setShowTikzExporter(false);
+  }, [showToolManager])
 
   const boardProps = {transform: transform, boardRef: boardRef, boardConfig: cfg}
 
@@ -467,10 +476,6 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     input.click();
   };
 
-  const handleTikzExport = () => {
-    setShowTikzExporter(true);
-  }
-
   const handleSetSelectedInStates = useCallback((s: null | string) => {
     setSelected(s);
     if (!usingToolRef.current) return;
@@ -547,7 +552,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         <button
           onClick={() => setUsingTool(prev => !prev)}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          title={`${currentToolID >= 0 ? ("Use Tool " + tools[currentToolID].name) : "Select a Tool to Use"}`}
+          title={`${currentToolID >= 0 ? ("Use Tool " + tools[currentToolID].name) : "Select a Tool for Use"}`}
         >
           <Wrench size={20} color={(currentToolID >= 0) ? (usingTool ? "#2563eb" : "black") : "gray"}/>
         </button>
@@ -567,11 +572,11 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           <Save size={20} />
         </button>
         <button
-          onClick={() => handleTikzExport()}
+          onClick={() => setShowTikzExporter(prev => !prev)}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
           title="Export as Tikz"
         >
-          <Code size={20} />
+          <Code size={20} color={showTikzExporter ? "#2563eb" : "black"}/>
         </button>
         <button
           onClick={() => handleUpload()}
@@ -627,7 +632,13 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
       )}
       {showToolManager && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <TransitionToolManager tools={tools} currentToolID={currentToolID} setCurrentToolID={setCurrentToolID} importTool={(t) => setTools([...tools, t])}/>
+          <TransitionToolManager 
+            tools={tools} 
+            currentToolID={currentToolID} 
+            setCurrentToolID={setCurrentToolID} 
+            importTool={(t) => setTools([...tools, t])}
+            importTools={(t) => setTools([...tools, ...t])}
+          />
         </div>
       )}
       {/* Loading state when dragging */}
