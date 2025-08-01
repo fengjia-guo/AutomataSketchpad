@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code, Wrench, Box } from 'lucide-react';
 import { GridLayer } from './GridLayer';
 import { StateProps } from './State';
 import StateLayer from './StateLayer';
@@ -8,6 +8,8 @@ import { getUniqueID } from './uuidRecord';
 import { TransitionProps } from './Transition';
 import { TransitionLayer } from './TransitionLayer';
 import { TikzExporter } from './TikzExporter';
+import { applyTool, TransitionEdge, TransitionTool } from './transitionTool';
+import { TransitionToolManager } from './TransitionToolManager';
 
 export interface Point {
   x: number;
@@ -49,6 +51,11 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [lastTransform, setLastTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
   const [showGrid, setShowGrid] = useState(true);
   const [showTikzExporter, setShowTikzExporter] = useState(false);
+  const [tools, setTools] = useState<TransitionTool[]>([]);
+  const [showToolManager, setShowToolManager] = useState(false);
+  const [currentToolID, setCurrentToolID] = useState<number>(-1);
+  const [usingTool, setUsingTool] = useState(false);
+  const [toolParams, setToolParams] = useState<string[]>([]);
 
   const [states, setStates] = useState<Record<string, StateProps>>({});
   const [transitions, setTransitions] = useState<Record<string, TransitionProps>>({});
@@ -66,6 +73,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
 
   const createTransitionRef = useRef(createTransition);
   const selectedRef = useRef(selected);
+  const usingToolRef = useRef(usingTool);
 
   const getState = (id: string) => {
     if (Object.prototype.hasOwnProperty.call(states, id)) {
@@ -88,6 +96,10 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
+
+  useEffect(() => {
+    usingToolRef.current = usingTool;
+  }, [usingTool]);
 
   const undo = useCallback(() => {
     if (headRef.current > 0) {
@@ -208,6 +220,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     if (!isDragging) {
       setSelected(null);
       setShowTikzExporter(false);
+      setShowToolManager(false);
       setCreateTransition(false);
       // clear selected
     }
@@ -308,6 +321,22 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }, [isMouseDown, handleMouseMove, handleMouseUp]);
 
+  useEffect(() => {
+    if (usingTool) setCreateTransition(false);
+  }, [usingTool]);
+
+  useEffect(() => {
+    if (createTransition) setUsingTool(false);
+  }, [createTransition]);
+
+  useEffect(() => {
+    if (showTikzExporter) setShowToolManager(false);
+  }, [showTikzExporter]);
+
+  useEffect(() => {
+    if (showToolManager) setShowTikzExporter(false);
+  }, [showToolManager])
+
   const boardProps = {transform: transform, boardRef: boardRef, boardConfig: cfg}
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -358,6 +387,29 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     setNeedUpdate(true);
   };
   
+  const insertTransitions = (edges: TransitionEdge[]) => {
+    var newTransitions: Record<string, TransitionProps> = {};
+    for (var i = 0; i < edges.length; i++) {
+      const edge = edges[i];
+      if (!Object.keys(states).includes(edge.fromID) || !Object.keys(states).includes(edge.toID)) {
+        console.log(`skip invalid edge ${edge}`);
+      } else {
+        const newTransitionID = getUniqueID({...transitions, ...newTransitions});
+        const newTransition: TransitionProps = {
+          fromID: edge.fromID, 
+          toID: edge.toID, 
+          id: newTransitionID, 
+          label: ""
+        };
+        newTransitions = {...newTransitions, ...{[newTransitionID]: newTransition}};
+      }
+    }
+    if (Object.keys(newTransitions).length > 0) {
+      setTransitions({...transitions, ...newTransitions});
+      setNeedUpdate(true);
+    }
+  }
+
   const handleCreateTransition = (s: StateProps) => {
     if (selectedRef.current && createTransitionRef.current) {
       if (!Object.keys(states).includes(selectedRef.current)) return setSelected(s.id); 
@@ -377,11 +429,11 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   };
 
   const handleStateClicked = (s: StateProps) => {
-    if (!createTransitionRef.current) return setSelected(s.id);
+    if (!createTransitionRef.current) return handleSetSelectedInStates(s.id);
     if (selectedRef.current) {
       handleCreateTransition(s);
     } else {
-      setSelected(s.id);
+      handleSetSelectedInStates(s.id);
     }
   };
 
@@ -424,9 +476,36 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     input.click();
   };
 
-  const handleTikzExport = () => {
-    setShowTikzExporter(true);
+  const handleSetSelectedInStates = useCallback((s: null | string) => {
+    setSelected(s);
+    if (!usingToolRef.current) return;
+    if (s !== null) {
+      setToolParams(prev => [...prev, s]);
+    } else {
+      setToolParams([]);
+    }
+  }, [usingTool]);
+
+  const handleApplyTool = () => {
+    if (usingTool && currentToolID >= 0) {
+      const tool = tools[currentToolID];
+      if (tool.stateCount === toolParams.length) {
+        const edges = applyTool(tool, toolParams);
+        if (edges == "invalid" || edges == "mismatch") {
+          console.error("Apply tool error: " + edges);
+        } else {
+          insertTransitions(edges);
+          setToolParams([]);
+        }
+      }
+    }
   }
+
+  useEffect(() => {
+    if (toolParams.length > 0) {
+      handleApplyTool();
+    }
+  }, [toolParams])
 
   const tikz = <TikzExporter states={states} transitions={transitions} boardConfig={config}/>
 
@@ -470,6 +549,20 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         >
           <MoveRight size={20} color={createTransition ? "#2563eb" : "black"}/>
         </button>
+        <button
+          onClick={() => setUsingTool(prev => !prev)}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title={`${currentToolID >= 0 ? ("Use Tool " + tools[currentToolID].name) : "Select a Tool for Use"}`}
+        >
+          <Wrench size={20} color={(currentToolID >= 0) ? (usingTool ? "#2563eb" : "black") : "gray"}/>
+        </button>
+        <button
+          onClick={() => setShowToolManager(prev => !prev)}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Manage Tools"
+        >
+          <Box size={20} color={showToolManager ? "#2563eb" : "black"}/>
+        </button>
         <div className="v-divider border-b-2" />
         <button
           onClick={() => handleStorage()}
@@ -479,11 +572,11 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           <Save size={20} />
         </button>
         <button
-          onClick={() => handleTikzExport()}
+          onClick={() => setShowTikzExporter(prev => !prev)}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
           title="Export as Tikz"
         >
-          <Code size={20} />
+          <Code size={20} color={showTikzExporter ? "#2563eb" : "black"}/>
         </button>
         <button
           onClick={() => handleUpload()}
@@ -535,6 +628,17 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
       {showTikzExporter && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           {tikz}
+        </div>
+      )}
+      {showToolManager && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <TransitionToolManager 
+            tools={tools} 
+            currentToolID={currentToolID} 
+            setCurrentToolID={setCurrentToolID} 
+            importTool={(t) => setTools([...tools, t])}
+            importTools={(t) => setTools([...tools, ...t])}
+          />
         </div>
       )}
       {/* Loading state when dragging */}
