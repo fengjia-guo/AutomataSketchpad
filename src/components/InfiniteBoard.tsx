@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code, Wrench, Box, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code, Wrench, Box, X, SquarePen } from 'lucide-react';
 import { GridLayer } from './GridLayer';
 import { Position, StateProps } from './State';
 import StateLayer from './StateLayer';
@@ -68,6 +68,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [config, setConfig] = useState<BoardConfig>(cfg);
   const [needUpdate, setNeedUpdate] = useState(false);
   const [clickPosition, setClickPosition] = useState<Position | null>(null);
+  const [allowEdit, setAllowEdit] = useState(true);
 
   const headRef = useRef(head);
   const historyRef = useRef(history);
@@ -191,6 +192,18 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
       e.preventDefault();
       forward();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'm' || e.key === 'M')) {
+      e.preventDefault();
+      setAllowEdit(prev => !prev);
+    } else if (e.altKey && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      setCreateTransition(prev => !prev);
+    } else if (e.shiftKey && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      setUsingTool(prev => !prev);
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault();
+      setShowToolManager(prev => !prev);
     }
   }, []);
 
@@ -537,7 +550,6 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }
 
-
   useEffect(() => {
     if (toolParams.length > 0) {
       handleApplyTool();
@@ -580,23 +592,31 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         </button>
         <div className="v-divider border-b-2" />
         <button
+          onClick={() => setAllowEdit(prev => !prev)}
+          className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          title="Click to Edit (Ctrl+M)"
+        >
+          <SquarePen size={20} color={allowEdit ? "#2563eb" : "black"}/>
+        </button>
+        <div className="v-divider border-b-2" />
+        <button
           onClick={() => setCreateTransition(prev => !prev)}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          title="Create Transition"
+          title="Create Transition (Alt+T)"
         >
           <MoveRight size={20} color={createTransition ? "#2563eb" : "black"}/>
         </button>
         <button
           onClick={() => setUsingTool(prev => !prev)}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          title={`${currentToolID >= 0 ? ("Use Tool " + tools[currentToolID].name) : "Select a Tool for Use"}`}
+          title={`${currentToolID >= 0 ? ("Use \"" + tools[currentToolID].name) + "\" (Shift+T)": "Select a Tool for Use"}`}
         >
           <Wrench size={20} color={(currentToolID >= 0) ? (usingTool ? "#2563eb" : "black") : "gray"}/>
         </button>
         <button
           onClick={() => setShowToolManager(prev => !prev)}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          title="Manage Tools"
+          title="Manage Tools (Ctrl+B)"
         >
           <Box size={20} color={showToolManager ? "#2563eb" : "black"}/>
         </button>
@@ -662,7 +682,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         onStateClicked={handleStateClicked}
         onStateDeleted={handleStateDelete}
       />
-      { selected && Object.keys(states).includes(selected) && 
+      { selected && Object.keys(states).includes(selected) && allowEdit && 
         <div className="absolute transform -translate-y-1/2"
           style={{
             left: getDisplayPosition(states[selected].position).x + config.gridSize * transform.scale / 2, 
@@ -676,7 +696,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           />
         </div>
       }
-      { selected && Object.keys(transitions).includes(selected) && clickPosition && 
+      { selected && Object.keys(transitions).includes(selected) && clickPosition && allowEdit && 
         <div className="absolute transform -translate-y-1/2" 
           style={{
             left: getDisplayPosition(clickPosition).x + transform.scale * config.gridSize * 0.5, 
@@ -708,7 +728,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
       )}
       {/* Loading state when dragging */}
       {isDragging && (
-        <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 pointer-events-none select-none">
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-20 text-white px-3 py-1 rounded-md text-sm">
             Dragging...
           </div>
