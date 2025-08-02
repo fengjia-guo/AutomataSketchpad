@@ -13,6 +13,7 @@ export interface StateLayerProps {
   callForUpdate?: () => void, 
   onStateClicked?: (_: StateProps) => void, 
   onStateDeleted?: (_: StateProps) => void, 
+  setLog?: (_: string) => void, 
 }
 
 export const StateLayer: React.FC<StateLayerProps> = ({
@@ -25,6 +26,7 @@ export const StateLayer: React.FC<StateLayerProps> = ({
   callForUpdate = () => {}, 
   onStateClicked = () => {}, 
   onStateDeleted = () => {}, 
+  setLog = () => {}, 
 }) => {
   
   const dragRegularizer = useCallback((state: StateProps, x: number, y: number) => {
@@ -34,7 +36,6 @@ export const StateLayer: React.FC<StateLayerProps> = ({
   const onPositionChange = useCallback((state: StateProps, result: Position | null | RegularizerAction) => {
     if (!result) return;
     if (result instanceof RegularizerAction) {
-      // console.log('get an action');
       const changes = updateStatesByAction(state, states, result);
       onStatesChange(changes);
     } else {
@@ -54,16 +55,18 @@ export const StateLayer: React.FC<StateLayerProps> = ({
     if (state.isDummy) return;
     const newStateProp: StateProps = {...state, isAccepting: !state.isAccepting};
     onStatesChange({[state.id]: newStateProp});
+    setLog(`Set state ${state.id.slice(0,6)} as ${state.isAccepting? "non-accepting" : "accepting"}`);
     callForUpdate();
-  }, [onStatesChange]);
+  }, [onStatesChange, setLog, callForUpdate]);
 
   const downgradeState = useCallback((state: StateProps) => {
     if (!state.isDummy) {
       const newStateProp: StateProps = {...state, isAccepting: false, isDummy: true};
       onStatesChange({[state.id]: newStateProp});
+      setLog(`Downgrade state ${state.id.slice(0,6)} to dummy`);
       callForUpdate();
     }
-  }, [states, onStatesChange, callForUpdate]);
+  }, [states, onStatesChange, setLog, callForUpdate]);
 
   const deleteState = useCallback((state: StateProps) => {
     if (!state.isDummy) return;
@@ -101,6 +104,7 @@ export const StateLayer: React.FC<StateLayerProps> = ({
             onDoubleClick={onDoubleClick}
             onDelete={handleDelete}
             callForUpdate={callForUpdate}
+            setLog={setLog}
           />
         </div>
       ))}
