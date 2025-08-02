@@ -26,7 +26,7 @@ interface renderTransitionProps {
 	positionRegularizer?: (state: StateProps, x: number, y: number) => Position | null | RegularizerAction, 
 	// x, y are relative position to the grids
 	// return null means that it is invalid
-	onClick?: (transition: TransitionProps) => void, 
+	onClick?: (transition: TransitionProps, event: React.MouseEvent) => void, 
 	onDelete?: (transition: TransitionProps) => void, 
 	callForUpdate?: () => void, 
 }
@@ -105,7 +105,7 @@ export const Transition: React.FC<renderTransitionProps> = ({
 		style={{pointerEvents: 'all'}}
 		onMouseEnter={() => setHovering(true)}
 		onMouseLeave={() => setHovering(false)}
-		onClick={() => onClick(transition)}
+		onClick={(e) => onClick(transition, e)}
 	/>
 
 	const distance = Math.sqrt(
@@ -183,7 +183,7 @@ export const Transition: React.FC<renderTransitionProps> = ({
 		style={{pointerEvents: 'all'}}
 		onMouseEnter={() => setHovering(true)}
 		onMouseLeave={() => setHovering(false)}
-		onClick={() => onClick(transition)}
+		onClick={(e) => onClick(transition, e)}
 	/>
 
 	const svg = <svg width={"100%"} height={"100%"} style={{pointerEvents: `none`, position: 'absolute', left: 0, top: 0}}>

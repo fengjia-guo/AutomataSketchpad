@@ -8,7 +8,7 @@ export interface TransitionLayerProps {
 	selected: null | string, 
 	boardProps: BoardObjectProps, 
 	getState: (id: string) => StateProps | null, 
-	onClick?: (transition: TransitionProps) => void, 
+	onClick?: (transition: TransitionProps, e: React.MouseEvent) => void, 
 	onDelete?: (transition: TransitionProps) => void, 
 }
 
