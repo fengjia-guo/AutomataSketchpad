@@ -4,8 +4,9 @@ import { StateProps } from "./State";
 import { RegularizerAction } from "./regularizer";
 import React, { useState } from "react";
 import { defaultBoardConfig } from "./InfiniteBoard";
-import { getRadius, interpolate } from "./util";
+import { getLabelPosition, getRadius, interpolate } from "./util";
 import { useCallback } from "react";
+import katex from "katex";
 
 const BLUE_600 = "#2563eb";
 
@@ -25,7 +26,7 @@ interface renderTransitionProps {
 	positionRegularizer?: (state: StateProps, x: number, y: number) => Position | null | RegularizerAction, 
 	// x, y are relative position to the grids
 	// return null means that it is invalid
-	onClick?: (transition: TransitionProps) => void, 
+	onClick?: (transition: TransitionProps, event: React.MouseEvent) => void, 
 	onDelete?: (transition: TransitionProps) => void, 
 	callForUpdate?: () => void, 
 }
@@ -104,13 +105,34 @@ export const Transition: React.FC<renderTransitionProps> = ({
 		style={{pointerEvents: 'all'}}
 		onMouseEnter={() => setHovering(true)}
 		onMouseLeave={() => setHovering(false)}
-		onClick={() => onClick(transition)}
+		onClick={(e) => onClick(transition, e)}
 	/>
 
 	const distance = Math.sqrt(
 		Math.pow(fromState.position.x - toState.position.x, 2) + 
 		Math.pow(fromState.position.y - toState.position.y, 2)
 	);
+
+	const labelHTML = katex.renderToString(transition.label, {
+		throwOnError: false,
+		displayMode: false,
+	});
+
+	const loopLabelCenterRelative: Position = {x: fromState.position.x, y: fromState.position.y - 0.5};
+	const loopLabelCenterDisplay = getDisplayPosition(loopLabelCenterRelative);
+
+	const loopLabel = <div 
+		dangerouslySetInnerHTML={{__html: labelHTML}} 
+		style={{
+			pointerEvents: `none`, 
+			position: `absolute`, 
+			left: loopLabelCenterDisplay.x, 
+			top: loopLabelCenterDisplay.y, 
+			transform: `translate(-50%, -50%) scale(${Math.min(1, scale)}`, 
+			color: isSelected ? BLUE_600 : `black`
+		}}
+		className="select-none"
+	/>
 
 	if (fromState.id === toState.id) {
 		const loopSVG =	<svg width={"100%"} height={"100%"} style={{pointerEvents: `none`, position: 'absolute', left: 0, top: 0}}>
@@ -121,6 +143,7 @@ export const Transition: React.FC<renderTransitionProps> = ({
 		</svg>
 		return <div tabIndex={0} onKeyDown={handleKeyDown}>
 			{loopSVG}
+			{loopLabel}
 		</div>;
 	}
 
@@ -129,8 +152,25 @@ export const Transition: React.FC<renderTransitionProps> = ({
 	const fromRatio = getRadius(fromState) / distance;
 	const toRatio = getRadius(toState) / distance;
 
-	const displayFromPos = getDisplayPosition(interpolate(fromState.position, toState.position, fromRatio));
-	const displayToPos = getDisplayPosition(interpolate(toState.position, fromState.position, toRatio));
+	const startPos = interpolate(fromState.position, toState.position, fromRatio);
+	const endPos = interpolate(toState.position, fromState.position, toRatio);
+
+	const displayFromPos = getDisplayPosition(startPos);
+	const displayToPos = getDisplayPosition(endPos);
+
+	const labelCenterDisplay = getDisplayPosition(getLabelPosition(startPos, endPos));
+	const label = <div 
+		dangerouslySetInnerHTML={{__html: labelHTML}} 
+		style={{
+			pointerEvents: `none`, 
+			position: `absolute`, 
+			left: labelCenterDisplay.x, 
+			top: labelCenterDisplay.y, 
+			transform: `translate(-50%, -50%) scale(${Math.min(1, scale)}`, 
+			color: isSelected ? BLUE_600 : `black`
+		}}
+		className="select-none"
+	/>
 
 	const lineBody = <line 
 		x1={displayFromPos.x}
@@ -143,7 +183,7 @@ export const Transition: React.FC<renderTransitionProps> = ({
 		style={{pointerEvents: 'all'}}
 		onMouseEnter={() => setHovering(true)}
 		onMouseLeave={() => setHovering(false)}
-		onClick={() => onClick(transition)}
+		onClick={(e) => onClick(transition, e)}
 	/>
 
 	const svg = <svg width={"100%"} height={"100%"} style={{pointerEvents: `none`, position: 'absolute', left: 0, top: 0}}>
@@ -154,5 +194,6 @@ export const Transition: React.FC<renderTransitionProps> = ({
 	</svg>
 	return <div tabIndex={0} onKeyDown={handleKeyDown}>
 		{svg}
+		{label}
 	</div>;
 };

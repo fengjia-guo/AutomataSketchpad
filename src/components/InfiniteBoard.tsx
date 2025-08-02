@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code, Wrench, Box } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code, Wrench, Box, X } from 'lucide-react';
 import { GridLayer } from './GridLayer';
-import { StateProps } from './State';
+import { Position, StateProps } from './State';
 import StateLayer from './StateLayer';
 import { gridRegularizer } from './regularizer';
 import { getUniqueID } from './uuidRecord';
@@ -10,6 +10,8 @@ import { TransitionLayer } from './TransitionLayer';
 import { TikzExporter } from './TikzExporter';
 import { applyTool, TransitionEdge, TransitionTool } from './transitionTool';
 import { TransitionToolManager } from './TransitionToolManager';
+import { StateEditor } from './StateEditor';
+import { TransitionEditor } from './TransitionEditor';
 
 export interface Point {
   x: number;
@@ -65,6 +67,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   const [head, setHead] = useState<number>(0);
   const [config, setConfig] = useState<BoardConfig>(cfg);
   const [needUpdate, setNeedUpdate] = useState(false);
+  const [clickPosition, setClickPosition] = useState<Position | null>(null);
 
   const headRef = useRef(head);
   const historyRef = useRef(history);
@@ -80,6 +83,22 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
       return states[id];
     } else return null;
   };
+
+  const getDisplayPosition = (pos: Position) => {
+    const scaledGridSize = config.gridSize * transform.scale;
+    return {
+      x: transform.x + pos.x * scaledGridSize,
+      y: transform.y + pos.y * scaledGridSize
+    }
+  }
+
+  const getRelativePosition = (x: number, y: number) => {
+    const scaledGridSize = config.gridSize * transform.scale;
+    return {
+      x: (x - transform.x) / scaledGridSize,
+      y: (y - transform.y) / scaledGridSize
+    }
+  }
 
   useEffect(() => {
     headRef.current = head;
@@ -100,6 +119,10 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
   useEffect(() => {
     usingToolRef.current = usingTool;
   }, [usingTool]);
+
+  useEffect(() => {
+    if (selected == null) setClickPosition(null);
+  }, [selected]);
 
   const undo = useCallback(() => {
     if (headRef.current > 0) {
@@ -221,7 +244,6 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
       setSelected(null);
       setShowTikzExporter(false);
       setShowToolManager(false);
-      setCreateTransition(false);
       // clear selected
     }
     setIsDragging(false);
@@ -501,6 +523,21 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }
 
+  const handleStateEditorChange = (id: string, newProp: StateProps) => {
+    if (selected && Object.keys(states).includes(selected) && id === selected) {
+      setStates({...states, ...{[id]: newProp}});
+      setNeedUpdate(true);
+    }
+  }
+
+  const handleTransitionEditorChange = (id: string, newProp: TransitionProps) => {
+    if (selected && Object.keys(transitions).includes(selected) && id === selected) {
+      setTransitions({...transitions, ...{[id]: newProp}});
+      setNeedUpdate(true);
+    }
+  }
+
+
   useEffect(() => {
     if (toolParams.length > 0) {
       handleApplyTool();
@@ -611,7 +648,7 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         selected={selected}
         boardProps={boardProps}
         getState={getState}
-        onClick={(t) => setSelected(t.id)}
+        onClick={(t, e) => {setSelected(t.id); setClickPosition(getRelativePosition(e.clientX, e.clientY))}}
         onDelete={handleTransitionDelete}
       />
       <StateLayer 
@@ -625,6 +662,34 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
         onStateClicked={handleStateClicked}
         onStateDeleted={handleStateDelete}
       />
+      { selected && Object.keys(states).includes(selected) && 
+        <div className="absolute transform -translate-y-1/2"
+          style={{
+            left: getDisplayPosition(states[selected].position).x + config.gridSize * transform.scale / 2, 
+            top: getDisplayPosition(states[selected].position).y
+          }}
+        >
+          <StateEditor 
+            state={states[selected]}
+            onClose={() => {}}
+            onChange={handleStateEditorChange}
+          />
+        </div>
+      }
+      { selected && Object.keys(transitions).includes(selected) && clickPosition && 
+        <div className="absolute transform -translate-y-1/2" 
+          style={{
+            left: getDisplayPosition(clickPosition).x + transform.scale * config.gridSize * 0.5, 
+            top: getDisplayPosition(clickPosition).y, 
+          }}
+        >
+          <TransitionEditor 
+            transition={transitions[selected]}
+            onClose={() => {}}
+            onChange={handleTransitionEditorChange}
+          />
+        </div>
+      }
       {showTikzExporter && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           {tikz}
