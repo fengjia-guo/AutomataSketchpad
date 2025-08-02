@@ -4,8 +4,9 @@ import { StateProps } from "./State";
 import { RegularizerAction } from "./regularizer";
 import React, { useState } from "react";
 import { defaultBoardConfig } from "./InfiniteBoard";
-import { getRadius, interpolate } from "./util";
+import { getLabelPosition, getRadius, interpolate } from "./util";
 import { useCallback } from "react";
+import katex from "katex";
 
 const BLUE_600 = "#2563eb";
 
@@ -112,6 +113,26 @@ export const Transition: React.FC<renderTransitionProps> = ({
 		Math.pow(fromState.position.y - toState.position.y, 2)
 	);
 
+	const labelHTML = katex.renderToString(transition.label, {
+		throwOnError: false,
+		displayMode: false,
+	});
+
+	const loopLabelCenterRelative: Position = {x: fromState.position.x, y: fromState.position.y - 0.5};
+	const loopLabelCenterDisplay = getDisplayPosition(loopLabelCenterRelative);
+
+	const loopLabel = <div 
+		dangerouslySetInnerHTML={{__html: labelHTML}} 
+		style={{
+			pointerEvents: `none`, 
+			position: `absolute`, 
+			left: loopLabelCenterDisplay.x, 
+			top: loopLabelCenterDisplay.y, 
+			transform: `translate(-50%, -50%) scale(${Math.min(1, scale)}`, 
+			color: isSelected ? BLUE_600 : `black`
+		}}
+	/>
+
 	if (fromState.id === toState.id) {
 		const loopSVG =	<svg width={"100%"} height={"100%"} style={{pointerEvents: `none`, position: 'absolute', left: 0, top: 0}}>
 			<defs>
@@ -121,6 +142,7 @@ export const Transition: React.FC<renderTransitionProps> = ({
 		</svg>
 		return <div tabIndex={0} onKeyDown={handleKeyDown}>
 			{loopSVG}
+			{loopLabel}
 		</div>;
 	}
 
@@ -129,8 +151,24 @@ export const Transition: React.FC<renderTransitionProps> = ({
 	const fromRatio = getRadius(fromState) / distance;
 	const toRatio = getRadius(toState) / distance;
 
-	const displayFromPos = getDisplayPosition(interpolate(fromState.position, toState.position, fromRatio));
-	const displayToPos = getDisplayPosition(interpolate(toState.position, fromState.position, toRatio));
+	const startPos = interpolate(fromState.position, toState.position, fromRatio);
+	const endPos = interpolate(toState.position, fromState.position, toRatio);
+
+	const displayFromPos = getDisplayPosition(startPos);
+	const displayToPos = getDisplayPosition(endPos);
+
+	const labelCenterDisplay = getDisplayPosition(getLabelPosition(startPos, endPos));
+	const label = <div 
+		dangerouslySetInnerHTML={{__html: labelHTML}} 
+		style={{
+			pointerEvents: `none`, 
+			position: `absolute`, 
+			left: labelCenterDisplay.x, 
+			top: labelCenterDisplay.y, 
+			transform: `translate(-50%, -50%) scale(${Math.min(1, scale)}`, 
+			color: isSelected ? BLUE_600 : `black`
+		}}
+	/>
 
 	const lineBody = <line 
 		x1={displayFromPos.x}
@@ -154,5 +192,6 @@ export const Transition: React.FC<renderTransitionProps> = ({
 	</svg>
 	return <div tabIndex={0} onKeyDown={handleKeyDown}>
 		{svg}
+		{label}
 	</div>;
 };

@@ -11,6 +11,7 @@ import { TikzExporter } from './TikzExporter';
 import { applyTool, TransitionEdge, TransitionTool } from './transitionTool';
 import { TransitionToolManager } from './TransitionToolManager';
 import { StateEditor } from './StateEditor';
+import { TransitionEditor } from './TransitionEditor';
 
 export interface Point {
   x: number;
@@ -517,6 +518,14 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }
 
+  const handleTransitionEditorChange = (id: string, newProp: TransitionProps) => {
+    if (selected && Object.keys(transitions).includes(selected) && id === selected) {
+      setTransitions({...transitions, ...{[id]: newProp}});
+      setNeedUpdate(true);
+    }
+  }
+
+
   useEffect(() => {
     if (toolParams.length > 0) {
       handleApplyTool();
@@ -668,6 +677,15 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
             state={states[selected]}
             onClose={() => {}}
             onChange={handleStateEditorChange}
+          />
+        </div>
+      }
+      { selected && Object.keys(transitions).includes(selected) && 
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <TransitionEditor 
+            transition={transitions[selected]}
+            onClose={() => {}}
+            onChange={handleTransitionEditorChange}
           />
         </div>
       }
