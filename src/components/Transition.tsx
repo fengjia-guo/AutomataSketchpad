@@ -131,6 +131,7 @@ export const Transition: React.FC<renderTransitionProps> = ({
 			transform: `translate(-50%, -50%) scale(${Math.min(1, scale)}`, 
 			color: isSelected ? BLUE_600 : `black`
 		}}
+		className="select-none"
 	/>
 
 	if (fromState.id === toState.id) {
@@ -168,6 +169,7 @@ export const Transition: React.FC<renderTransitionProps> = ({
 			transform: `translate(-50%, -50%) scale(${Math.min(1, scale)}`, 
 			color: isSelected ? BLUE_600 : `black`
 		}}
+		className="select-none"
 	/>
 
 	const lineBody = <line 
