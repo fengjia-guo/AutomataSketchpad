@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, MoveRight, Save, Upload, Grid3X3, Code, Wrench, Box } from 'lucide-react';
 import { GridLayer } from './GridLayer';
-import { StateProps } from './State';
+import { Position, StateProps } from './State';
 import StateLayer from './StateLayer';
 import { gridRegularizer } from './regularizer';
 import { getUniqueID } from './uuidRecord';
@@ -10,6 +10,7 @@ import { TransitionLayer } from './TransitionLayer';
 import { TikzExporter } from './TikzExporter';
 import { applyTool, TransitionEdge, TransitionTool } from './transitionTool';
 import { TransitionToolManager } from './TransitionToolManager';
+import { StateEditor } from './StateEditor';
 
 export interface Point {
   x: number;
@@ -80,6 +81,14 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
       return states[id];
     } else return null;
   };
+
+  const getDisplayPosition = (pos: Position) => {
+    const scaledGridSize = config.gridSize * transform.scale;
+    return {
+      x: transform.x + pos.x * scaledGridSize,
+      y: transform.y + pos.y * scaledGridSize
+    }
+  }
 
   useEffect(() => {
     headRef.current = head;
@@ -501,6 +510,13 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
     }
   }
 
+  const handleStateEditorChange = (id: string, newProp: StateProps) => {
+    if (selected && Object.keys(states).includes(selected) && id === selected) {
+      setStates({...states, ...{[id]: newProp}});
+      setNeedUpdate(true);
+    }
+  }
+
   useEffect(() => {
     if (toolParams.length > 0) {
       handleApplyTool();
@@ -641,6 +657,20 @@ const InfiniteBoard: React.FC<{cfg: BoardConfig}> = ({cfg = defaultBoardConfig})
           />
         </div>
       )}
+      { selected && Object.keys(states).includes(selected) && 
+        <div className="absolute transform -translate-y-1/2"
+          style={{
+            left: getDisplayPosition(states[selected].position).x + config.gridSize * transform.scale / 2, 
+            top: getDisplayPosition(states[selected].position).y
+          }}
+        >
+          <StateEditor 
+            state={states[selected]}
+            onClose={() => {}}
+            onChange={handleStateEditorChange}
+          />
+        </div>
+      }
       {/* Loading state when dragging */}
       {isDragging && (
         <div className="absolute inset-0 pointer-events-none">
