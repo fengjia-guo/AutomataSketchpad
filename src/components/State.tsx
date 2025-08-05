@@ -112,7 +112,7 @@ export const State: React.FC<renderStateProps> = (prop) => {
         myState.position.x !== statePositionAtDrag.x || 
         myState.position.y !== statePositionAtDrag.y
       ) {
-        setLog(myState.merged ? `Merge state ${myState.id.slice(0,6)}` : `Move state ${myState.id.slice(0,6)}`);
+        setLog(myState.merged ? `Merge state ${myState.id.slice(0,6)} to ${myState.merged.slice(0,6)}` : `Move state ${myState.id.slice(0,6)}`);
         callForUpdate(); // call for update after dragging, if position has changed
       }
     }
